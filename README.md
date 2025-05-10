@@ -5,6 +5,10 @@
 
 This custom node integrates **[EmulatorJS](https://github.com/EmulatorJS/EmulatorJS)** into ComfyUI, allowing you to run retro games and capture their screens for your image generation workflows.
 
+
+https://github.com/user-attachments/assets/1894a9f6-4e30-4658-b014-143696e800c1
+
+
 ## Key Features
 
 -   Run games from many classic consoles.
