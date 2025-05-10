@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>PlayStation Emulator Runner</title>
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #222; 
+        }
+        #emulator {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+    </style>
+</head>
+<body>
+    <div id="emulator"></div>
+    <script type="text/javascript">
+        (function() {
+            const origGetContext = HTMLCanvasElement.prototype.getContext;
+            HTMLCanvasElement.prototype.getContext = function(type, attrs) {
+                if (type === 'webgl' || type === 'experimental-webgl' || type === 'webgl2') {
+                    attrs = attrs || {};
+                    attrs.preserveDrawingBuffer = true;
+                }
+                return origGetContext.call(this, type, attrs);
+            };
+        })();
+        window.onerror = function(msg, url, lineNo, columnNo, error) {
+            console.error('Error:', msg, '\nURL:', url, '\nLine:', lineNo, '\nColumn:', columnNo, '\nError:', error);
+            return false;
+        };
+        const urlParams = new URLSearchParams(window.location.search);
+        const core = urlParams.get('core') || 'pcsx_rearmed';
+        const rom = urlParams.get('rom'); 
+        const bios = urlParams.get('bios'); 
+        const displayWidth = parseInt(urlParams.get('width') || 640, 10);
+        const displayHeight = parseInt(urlParams.get('height') || 480, 10);
+        const SCALE_FACTOR = 4;
+        const internalWidth = Math.floor(displayWidth / SCALE_FACTOR);
+        const internalHeight = Math.floor(displayHeight / SCALE_FACTOR);
+        window.EJS_DEBUG_XX = false; 
+        window.EJS_DEBUG = false;    
+        window.extensionBasePath = '/extensions/ComfyUI-RetroEngine';
+        window.emulatorDataPath = window.extensionBasePath + '/emulator_core/data';
+        window.EJS_player = '#emulator';
+        window.EJS_core = core;
+        window.EJS_pathtodata = window.emulatorDataPath + '/';
+        window.EJS_biosUrl = bios ? window.extensionBasePath + '/' + bios : '';
+        window.EJS_gameUrl = rom ? window.extensionBasePath + '/' + rom : '';
+        window.EJS_gameID = rom; 
+        window.EJS_width = internalWidth;
+        window.EJS_height = internalHeight;
+        window.EJS_startOnLoaded = true;
+        window.EJS_CacheLimit = 1073741824; 
+        window.EJS_threaded = true;
+        window.EJS_speedHack = true;
+        window.EJS_webaudio = true;
+        window.EJS_smooth = false;
+        window.EJS_noInitialRun = false;
+        window.EJS_loadStateOnStart = false;
+        window.EJS_defaultQuickSaveSlot = 0;
+        window.EJS_screenRecording = true;
+        window.EJS_paths = {
+            'emulator.min.js': window.emulatorDataPath + '/emulator.min.js',
+            'emulator.js': window.emulatorDataPath + '/emulator.min.js',
+            'emulator.min.css': window.emulatorDataPath + '/emulator.min.css',
+            'emulator.css': window.emulatorDataPath + '/emulator.min.css',
+            'loader.js': window.emulatorDataPath + '/loader.js.dep', 
+            'nipplejs.js': window.emulatorDataPath + '/src/nipplejs.js',
+            'shaders.js': window.emulatorDataPath + '/src/shaders.js',
+            'storage.js': window.emulatorDataPath + '/src/storage.js',
+            'gamepad.js': window.emulatorDataPath + '/src/gamepad.js',
+            'GameManager.js': window.emulatorDataPath + '/src/GameManager.js',
+            'socket.io.min.js': window.emulatorDataPath + '/src/socket.io.min.js',
+            'compression.js': window.emulatorDataPath + '/src/compression.js',
+            'libunrar.js': window.emulatorDataPath + '/compression/libunrar.js.dep',
+            'extract7z.js': window.emulatorDataPath + '/compression/extract7z.js.dep',
+            'extractzip.js': window.emulatorDataPath + '/compression/extractzip.js.dep',
+            'libunrar.wasm': window.emulatorDataPath + '/compression/libunrar.wasm'
+        };
+        function loadScript(src) {
+            return new Promise((resolve, reject) => {
+                const script = document.createElement('script');
+                script.src = src;
+                script.onload = () => {
+                    resolve();
+                };
+                script.onerror = (e) => {
+                    console.error('Failed to load script:', src, e);
+                    reject(new Error(`Failed to load script: ${src}`));
+                };
+                document.body.appendChild(script);
+            });
+        }
+        async function loadEmulator() {
+            try {
+                await loadScript(window.EJS_paths['loader.js']);
+            } catch (error) {
+                console.error('Failed to load emulator:', error);
+            }
+        }
+        loadEmulator().catch(console.error);
+        window.addEventListener('message', async (event) => {
+            if (event.data?.type === 'canvasCaptureRequest') {
+                requestAnimationFrame(() => {
+                    try {
+                        const canvas = window.EJS_emulator?.canvas;
+                        if (!canvas) {
+                            event.source.postMessage({ type: 'canvasCaptureFailed', error: 'Canvas not found' }, event.origin || '*');
+                            return;
+                        }
+                        const gl = canvas.getContext('webgl2') || canvas.getContext('webgl');
+                        if (!gl) {
+                            event.source.postMessage({ type: 'canvasCaptureFailed', error: 'WebGL context not available' }, event.origin || '*');
+                            return;
+                        }
+                        const w = canvas.width, h = canvas.height;
+                        if (w === 0 || h === 0) {
+                            event.source.postMessage({ type: 'canvasCaptureFailed', error: 'Canvas dimensions are zero' }, event.origin || '*');
+                            return;
+                        }
+                        const pixels = new Uint8Array(w * h * 4);
+                        gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+                        const rgb = new Uint8Array(w * h * 3);
+                        for (let i = 0, j = 0; i < pixels.length; i += 4, j += 3) {
+                            rgb[j] = pixels[i];      
+                            rgb[j+1] = pixels[i+1];  
+                            rgb[j+2] = pixels[i+2];  
+                        }
+                        let binary = '';
+                        for (let k = 0; k < rgb.length; k++) {
+                            binary += String.fromCharCode(rgb[k]);
+                        }
+                        const b64 = btoa(binary);
+                        const dataStr = `data:application/octet-stream;base64,${b64}`;
+                        event.source.postMessage({ type: 'canvasCapture', payload: dataStr }, event.origin || '*');
+                    } catch (e) {
+                        event.source.postMessage({ type: 'canvasCaptureFailed', error: e.message || 'Unknown capture error' }, event.origin || '*');
+                    }
+                });
+            }
+        });
+        setTimeout(() => {
+            const emulatorDiv = document.getElementById('emulator');
+            emulatorDiv.style.width = `${displayWidth / SCALE_FACTOR}px`;
+            emulatorDiv.style.height = `${displayHeight / SCALE_FACTOR}px`;
+            emulatorDiv.style.transform = `scale(${SCALE_FACTOR})`;
+            emulatorDiv.style.transformOrigin = 'top left';
+        }, 0);
+    </script>
+</body>
+</html>

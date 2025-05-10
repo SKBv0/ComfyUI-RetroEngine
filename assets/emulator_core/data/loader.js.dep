@@ -1,0 +1,198 @@
+(async function() {
+    const scripts = [
+        "emulator.js",
+        "nipplejs.js",
+        "shaders.js",
+        "storage.js",
+        "gamepad.js",
+        "GameManager.js",
+        "socket.io.min.js",
+        "compression.js"
+    ];
+
+    const folderPath = (path) => path.substring(0, path.length - path.split('/').pop().length);
+    
+    // Ensure EJS_pathtodata exists and is a string, provide a fallback.
+    let scriptPath = (typeof window.EJS_pathtodata === 'string') ? window.EJS_pathtodata : '/extensions/ComfyUI-RetroEngine/assets/emulator_core/data/'; 
+    
+    // Ensure scriptPath ends with a slash
+    if (scriptPath && !scriptPath.endsWith('/')) { 
+        scriptPath += '/';
+    }
+    
+    console.log(`[Loader.js] Resolved scriptPath: ${scriptPath}`);
+    
+    function loadScript(file) {
+        return new Promise(function (resolve, reject) {
+            let script = document.createElement('script');
+            let fileName = file; // Default filename
+            
+            // Remove http://127.0.0.1:8188 if it exists in the scriptPath
+            let cleanScriptPath = scriptPath.replace('http://127.0.0.1:8188', '');
+            
+            // Determine the correct filename (minified or src version) if EJS_paths is available
+            if ('undefined' !== typeof window.EJS_paths && typeof window.EJS_paths[file] === 'string') {
+                // Use the full path from EJS_paths but ensure it's relative
+                script.src = window.EJS_paths[file].replace('http://127.0.0.1:8188', '');
+            } else {
+                // Construct the final URL using scriptPath and the determined filename
+                // Assume non-minified core scripts live directly in scriptPath/src/
+                let srcUrl = cleanScriptPath + fileName;
+                if (fileName.endsWith('.js') && !fileName.includes('.min.')) {
+                    const nonMinifiedCoreScripts = [
+                        "emulator.js", "nipplejs.js", "shaders.js", "storage.js",
+                        "gamepad.js", "GameManager.js", "socket.io.min.js", "compression.js"
+                    ];
+                    if (nonMinifiedCoreScripts.includes(fileName)) {
+                        srcUrl = cleanScriptPath + 'src/' + fileName;
+                    } else if (fileName.endsWith('.js.dep')) { // Handle renamed dependencies
+                        srcUrl = cleanScriptPath + 'compression/' + fileName;
+                    }
+                }
+                script.src = srcUrl;
+            }
+            
+            console.log(`[Loader.js] Attempting to load script: ${script.src}`); 
+
+            script.onload = resolve;
+            script.onerror = () => {
+                console.error(`[Loader.js] Failed to load script: ${script.src}`);
+                reject(new Error(`Failed to load script: ${script.src}`)); 
+            }
+            document.head.appendChild(script);
+        })
+    }
+    
+    function loadStyle(file) {
+        return new Promise(function(resolve, reject) {
+            let css = document.createElement('link');
+            css.rel = 'stylesheet';
+            let fileName = file;
+
+            // Determine the correct filename if EJS_paths is available
+            if ('undefined' !== typeof window.EJS_paths && typeof window.EJS_paths[file] === 'string') {
+                 fileName = window.EJS_paths[file].split('/').pop();
+            }
+
+            // Construct final URL
+            let hrefUrl = scriptPath + fileName;
+             if (fileName === 'emulator.css') { // Handle non-minified CSS fallback name
+                 hrefUrl = scriptPath + 'emulator.css';
+             }
+
+            css.href = hrefUrl;
+            console.log(`[Loader.js] Attempting to load style: ${css.href}`); 
+
+            css.onload = resolve;
+            css.onerror = () => {
+                 console.error(`[Loader.js] Failed to load style: ${hrefUrl}`);
+                 reject(new Error(`Failed to load style: ${hrefUrl}`));
+                 // Removed filesmissing fallback
+            }
+            document.head.appendChild(css);
+        })
+    }
+
+    // Simplified loading logic - directly try loading minified versions
+    try {
+        console.log("[Loader.js] Attempting to load minified assets...");
+        await loadScript('emulator.min.js');
+        await loadStyle('emulator.min.css');
+        console.log("[Loader.js] Minified assets loaded successfully.");
+    } catch (error) {
+        console.warn("[Loader.js] Failed to load minified assets, attempting non-minified:", error);
+        // Fallback to non-minified (requires src files and emulator.css to exist)
+        try {
+            console.log("[Loader.js] Attempting to load non-minified assets...");
+            for (let i=0; i<scripts.length; i++) {
+                await loadScript(scripts[i]); 
+            }
+            await loadStyle('emulator.css');
+            console.log("[Loader.js] Non-minified assets loaded successfully.");
+        } catch (fallbackError) {
+             console.error("[Loader.js] Failed to load non-minified assets as well:", fallbackError);
+             throw fallbackError; // Re-throw if both fail
+        }
+    }
+
+    const config = {};
+    config.gameUrl = window.EJS_gameUrl;
+    config.dataPath = scriptPath;
+    config.system = window.EJS_core;
+    config.biosUrl = window.EJS_biosUrl;
+    config.gameName = window.EJS_gameName;
+    config.color = window.EJS_color;
+    config.adUrl = window.EJS_AdUrl;
+    config.adMode = window.EJS_AdMode;
+    config.adTimer = window.EJS_AdTimer;
+    config.adSize = window.EJS_AdSize;
+    config.alignStartButton = window.EJS_alignStartButton;
+    config.VirtualGamepadSettings = window.EJS_VirtualGamepadSettings;
+    config.buttonOpts = window.EJS_Buttons;
+    config.volume = window.EJS_volume;
+    config.defaultControllers = window.EJS_defaultControls;
+    config.startOnLoad = window.EJS_startOnLoaded;
+    config.fullscreenOnLoad = window.EJS_fullscreenOnLoaded;
+    config.filePaths = window.EJS_paths;
+    config.loadState = window.EJS_loadStateURL;
+    config.cacheLimit = window.EJS_CacheLimit;
+    config.cheats = window.EJS_cheats;
+    config.defaultOptions = window.EJS_defaultOptions;
+    config.gamePatchUrl = window.EJS_gamePatchUrl;
+    config.gameParentUrl = window.EJS_gameParentUrl;
+    config.netplayUrl = window.EJS_netplayServer;
+    config.gameId = window.EJS_gameID;
+    config.backgroundImg = window.EJS_backgroundImage;
+    config.backgroundBlur = window.EJS_backgroundBlur;
+    config.backgroundColor = window.EJS_backgroundColor;
+    config.controlScheme = window.EJS_controlScheme;
+    config.threads = window.EJS_threads;
+    config.disableCue = window.EJS_disableCue;
+    config.startBtnName = window.EJS_startButtonName;
+    config.softLoad = window.EJS_softLoad;
+    config.screenRecording = window.EJS_screenRecording;
+    config.externalFiles = window.EJS_externalFiles;
+    config.disableDatabases = window.EJS_disableDatabases;
+    config.disableLocalStorage = window.EJS_disableLocalStorage;
+    config.forceLegacyCores = window.EJS_forceLegacyCores;
+    config.noAutoFocus = window.EJS_noAutoFocus;
+    config.videoRotation = window.EJS_videoRotation;
+    config.shaders = Object.assign({}, window.EJS_SHADERS, window.EJS_shaders ? window.EJS_shaders : {});
+    
+    if (typeof window.EJS_language === "string" && window.EJS_language !== "en-US") {
+        try {
+            let path;
+            if ('undefined' != typeof EJS_paths && typeof EJS_paths[window.EJS_language] === 'string') {
+                path = EJS_paths[window.EJS_language];
+            } else {
+                path = scriptPath+"localization/"+window.EJS_language+".json";
+            }
+            config.language = window.EJS_language;
+            config.langJson = JSON.parse(await (await fetch(path)).text());
+        } catch(e) {
+            config.langJson = {};
+        }
+    }
+    
+    // Initialize EmulatorJS with selector
+    window.EJS_emulator = new EmulatorJS(window.EJS_player, config);
+    window.EJS_adBlocked = (url, del) => window.EJS_emulator.adBlocked(url, del);
+    if (typeof window.EJS_ready === "function") {
+        window.EJS_emulator.on("ready", window.EJS_ready);
+    }
+    if (typeof window.EJS_onGameStart === "function") {
+        window.EJS_emulator.on("start", window.EJS_onGameStart);
+    }
+    if (typeof window.EJS_onLoadState === "function") {
+        window.EJS_emulator.on("loadState", window.EJS_onLoadState);
+    }
+    if (typeof window.EJS_onSaveState === "function") {
+        window.EJS_emulator.on("saveState", window.EJS_onSaveState);
+    }
+    if (typeof window.EJS_onLoadSave === "function") {
+        window.EJS_emulator.on("loadSave", window.EJS_onLoadSave);
+    }
+    if (typeof window.EJS_onSaveSave === "function") {
+        window.EJS_emulator.on("saveSave", window.EJS_onSaveSave);
+    }
+})();
