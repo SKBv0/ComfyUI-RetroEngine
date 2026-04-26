@@ -163,6 +163,11 @@ app.registerExtension({
         const onNodeCreated = nodeType.prototype.onNodeCreated;
         nodeType.prototype.onNodeCreated = function() {
             onNodeCreated?.apply(this, arguments);
+            this.serialize_widgets = true;
+            this.powerButtonState = { isHovered: false, isOn: false };
+            if (!this.flags) this.flags = {};
+            this.flags.collapsed = false;
+
             const systemWidget = this.widgets.find(w => w.name === "system");
             const romWidget = this.widgets.find(w => w.name === "game_rom_path");
             const coreWidget = this.widgets.find(w => w.name === "core");
@@ -247,15 +252,6 @@ app.registerExtension({
             if (app.graph) {
                  app.graph.setDirtyCanvas(true, true);
             }
-        };
-
-        const origConstructor = nodeType.prototype.constructor;
-        nodeType.prototype.constructor = function() {
-            origConstructor.apply(this, arguments);
-            this.serialize_widgets = true;
-            this.powerButtonState = { isHovered: false, isOn: false };
-            if (!this.flags) this.flags = {};
-            this.flags.collapsed = false;
         };
 
         Object.assign(nodeType.prototype, {
